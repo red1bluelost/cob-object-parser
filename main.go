@@ -1,7 +1,13 @@
 package main
 
-import "fmt"
+import (
+	"os"
+)
 
 func main() {
-	fmt.Printf("Soon to parse Clang-Offload-Bundle\n")
+	file, err := os.Open("../spmm.o")
+	if err != nil {
+		panic(err)
+	}
+	_, err = ReadBundleObject()
 }
