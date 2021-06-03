@@ -12,6 +12,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = cob.ReadBundleObject(file)
-	fmt.Printf("Result: %s\n", err)
+	obj, err := cob.ReadBundleObject(file)
+	fmt.Printf("Result: %v\nError: %s\n", obj, err)
 }

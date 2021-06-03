@@ -2,6 +2,7 @@ package clangoffloadbundle
 
 import (
 	"bufio"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"reflect"
@@ -22,11 +23,17 @@ type bundleEntryHeader struct {
 
 func ReadBundleObject(file io.Reader) (*ObjectLayout, error) {
 	r := bufio.NewReader(file)
-	if err := verifyMagicString(r); err != nil {
+	var err error
+	if err = verifyMagicString(r); err != nil {
+		return nil, err
+	}
+	objLayout := new(ObjectLayout)
+
+	if objLayout.numBundleEntries, err = readNumber(r); err != nil {
 		return nil, err
 	}
 
-	return nil, fmt.Errorf("to be implemented")
+	return objLayout, fmt.Errorf("to be implemented")
 }
 
 func verifyMagicString(r *bufio.Reader) error {
@@ -38,4 +45,12 @@ func verifyMagicString(r *bufio.Reader) error {
 		return fmt.Errorf("magic string not located at front of file")
 	}
 	return nil
+}
+
+func readNumber(r *bufio.Reader) (uint64, error) {
+	number8byte := make([]byte, 8)
+	if n, err := r.Read(number8byte); err != nil || n != 8 {
+		return 0, fmt.Errorf("read n=%d, and error: %s", n, err)
+	}
+	return binary.LittleEndian.Uint64(number8byte), nil
 }
