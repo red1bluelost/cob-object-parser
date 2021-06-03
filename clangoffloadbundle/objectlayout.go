@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"reflect"
 )
 
 type ObjectLayout struct {
@@ -19,11 +20,22 @@ type bundleEntryHeader struct {
 	id     []byte
 }
 
-func ReadBundleObject(f io.Reader) (*ObjectLayout, error) {
-	inFile := bufio.NewReader(f)
-	magicString := make([]byte, 24)
-	if n, err := inFile.Read(magicString); err != nil || n != 24 {
-		return nil, fmt.Errorf("read n=%d, and error: %s", n, err)
+func ReadBundleObject(file io.Reader) (*ObjectLayout, error) {
+	r := bufio.NewReader(file)
+	if err := verifyMagicString(r); err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("success: %s", magicString)
+
+	return nil, fmt.Errorf("to be implemented")
+}
+
+func verifyMagicString(r *bufio.Reader) error {
+	magicString := make([]byte, 24)
+	if n, err := r.Read(magicString); err != nil || n != 24 {
+		return fmt.Errorf("read n=%d, and error: %s", n, err)
+	}
+	if !reflect.DeepEqual(magicString, []byte("__CLANG_OFFLOAD_BUNDLE__")) {
+		return fmt.Errorf("magic string not located at front of file")
+	}
+	return nil
 }
