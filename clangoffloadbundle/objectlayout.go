@@ -67,7 +67,15 @@ func ReadBundleObject(file io.Reader) (*ObjectLayout, error) {
 		objLayout.headers = append(objLayout.headers, header)
 	}
 
-	return objLayout, fmt.Errorf("to be implemented")
+	objLayout.codeObjects = make([][]byte, 2)
+	for i, header := range objLayout.headers {
+		object := make([]byte, header.size)
+		if n, err := io.ReadFull(r, object); err != nil || uint64(n) != header.size {
+			return nil, fmt.Errorf("read %d but should be %d, and error: %s", n, header.size, err)
+		}
+		objLayout.codeObjects[i] = object
+	}
+	return objLayout, nil
 }
 
 func verifyMagicString(r *bufio.Reader) error {
