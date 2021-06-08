@@ -1,7 +1,6 @@
 package clangoffloadbundle
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -13,6 +12,8 @@ type ObjectLayout struct {
 	numBundleEntries uint64
 	headers          []bundleEntryHeader
 	codeObjects      [][]byte
+
+	readSeeker io.ReadSeeker
 }
 
 func (o *ObjectLayout) String() string {
@@ -35,6 +36,22 @@ func (o *ObjectLayout) String() string {
 	return b.String()
 }
 
+func (o *ObjectLayout) GetCodeObject(index int) []byte {
+	if o.codeObjects[index] == nil {
+		header := o.headers[index]
+		r := o.readSeeker
+		if _, err := r.Seek(int64(header.offset), io.SeekStart); err != nil {
+			panic(err)
+		}
+		object := make([]byte, header.size)
+		if n, err := io.ReadFull(r, object); err != nil || uint64(n) != header.size {
+			panic(fmt.Errorf("read %d but should be %d, and error: %s", n, header.size, err))
+		}
+		o.codeObjects[index] = object
+	}
+	return o.codeObjects[index]
+}
+
 type bundleEntryHeader struct {
 	offset uint64
 	size   uint64
@@ -46,13 +63,13 @@ func (b *bundleEntryHeader) String() string {
 	return fmt.Sprintf("{%d %d %d %s}", b.offset, b.size, b.idLen, b.id)
 }
 
-func ReadBundleObject(file io.Reader) (*ObjectLayout, error) {
-	r := bufio.NewReader(file)
+func ReadBundleObject(r io.ReadSeeker) (*ObjectLayout, error) {
 	var err error
 	if err = verifyMagicString(r); err != nil {
 		return nil, err
 	}
 	objLayout := new(ObjectLayout)
+	objLayout.readSeeker = r
 
 	if objLayout.numBundleEntries, err = readNumber(r); err != nil {
 		return nil, err
@@ -67,18 +84,11 @@ func ReadBundleObject(file io.Reader) (*ObjectLayout, error) {
 		objLayout.headers = append(objLayout.headers, header)
 	}
 
-	objLayout.codeObjects = make([][]byte, 2)
-	for i, header := range objLayout.headers {
-		object := make([]byte, header.size)
-		if n, err := io.ReadFull(r, object); err != nil || uint64(n) != header.size {
-			return nil, fmt.Errorf("read %d but should be %d, and error: %s", n, header.size, err)
-		}
-		objLayout.codeObjects[i] = object
-	}
+	objLayout.codeObjects = make([][]byte, objLayout.numBundleEntries)
 	return objLayout, nil
 }
 
-func verifyMagicString(r *bufio.Reader) error {
+func verifyMagicString(r io.Reader) error {
 	magicString := make([]byte, 24)
 	if n, err := r.Read(magicString); err != nil || n != 24 {
 		return fmt.Errorf("read n=%d, and error: %s", n, err)
@@ -89,7 +99,7 @@ func verifyMagicString(r *bufio.Reader) error {
 	return nil
 }
 
-func readNumber(r *bufio.Reader) (uint64, error) {
+func readNumber(r io.Reader) (uint64, error) {
 	number8byte := make([]byte, 8)
 	if n, err := r.Read(number8byte); err != nil || n != 8 {
 		return 0, fmt.Errorf("read n=%d, and error: %s", n, err)
@@ -97,7 +107,7 @@ func readNumber(r *bufio.Reader) (uint64, error) {
 	return binary.LittleEndian.Uint64(number8byte), nil
 }
 
-func readHeader(r *bufio.Reader) (bundleEntryHeader, error) {
+func readHeader(r io.Reader) (bundleEntryHeader, error) {
 	header := bundleEntryHeader{}
 	var err error
 	header.offset, err = readNumber(r)
